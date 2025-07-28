@@ -10,6 +10,7 @@ import com.blankj.utilcode.util.ScreenUtils
 import kotlinx.serialization.Serializable
 import li.songe.gkd.shizuku.safeLongTap
 import li.songe.gkd.shizuku.safeTap
+import java.util.Random
 
 @Serializable
 data class GkdAction(
@@ -41,8 +42,7 @@ sealed class ActionPerformer(val action: String) {
             position: RawSubscription.Position?,
         ): ActionResult {
             return ActionResult(
-                action = action,
-                result = node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                action = action, result = node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
             )
         }
     }
@@ -78,8 +78,7 @@ sealed class ActionPerformer(val action: String) {
                     true
                 } else {
                     false
-                },
-                position = x to y
+                }, position = x to y
             )
         }
     }
@@ -196,6 +195,64 @@ sealed class ActionPerformer(val action: String) {
         }
     }
 
+    data object ScrollUp : ActionPerformer("scrollUp") {
+        override fun perform(
+            context: AccessibilityService,
+            node: AccessibilityNodeInfo,
+            position: RawSubscription.Position?,
+        ): ActionResult {
+            val random = Random()
+            val screenWidth = ScreenUtils.getScreenWidth()
+            val screenHeight = ScreenUtils.getScreenHeight()
+            
+            // 起点和终点位置添加随机性
+            val startX = screenWidth * (0.4f + random.nextFloat() * 0.1f)
+            val startY = screenHeight * (0.75f + random.nextFloat() * 0.1f)
+            
+            // 确定滑动方向（轻微向左或向右，但保持一致方向）
+            // 生成一个-1到1之间的值，决定整体滑动方向
+            val directionBias = random.nextFloat() * 0.3f - 0.15f // -0.15到0.15之间的偏移
+            
+            // 终点X坐标在起点基础上添加方向偏移
+            val endX = startX + screenWidth * directionBias
+            val endY = screenHeight * (0.2f + random.nextFloat() * 0.1f)
+            
+            // 创建路径
+            val path = Path()
+            path.moveTo(startX, startY)
+            
+            // 使用二次贝塞尔曲线创建平滑的路径
+            // 控制点在路径中间，但X坐标有轻微偏移，创造自然的弧度
+            val controlX = (startX + endX) / 2 + screenWidth * directionBias * 0.5f * (random.nextFloat() - 0.5f)
+            val controlY = (startY + endY) / 2
+            
+            // 添加贝塞尔曲线
+            path.quadTo(controlX, controlY, endX, endY)
+            
+            // 创建手势，设置持续时间在200-300ms之间，模拟真实滑动速度
+            val duration = 200L + random.nextInt(100)
+            val builder = GestureDescription.Builder()
+            builder.addStroke(GestureDescription.StrokeDescription(path, 0L, duration))
+            val gesture = builder.build()
+            
+            return ActionResult(
+                action = action, result = context.dispatchGesture(
+                    gesture, object : AccessibilityService.GestureResultCallback() {
+                        override fun onCompleted(gestureDescription: GestureDescription) {
+                            super.onCompleted(gestureDescription)
+                            //                LogUtil.d(TAG, "dispatchGesture onCompleted: 完成...");
+                        }
+
+                        override fun onCancelled(gestureDescription: GestureDescription) {
+                            super.onCancelled(gestureDescription)
+                            //                LogUtil.d(TAG, "dispatchGesture onCancelled: 取消...");
+                        }
+                    }, null
+                )
+            )
+        }
+    }
+
     companion object {
         private val allSubObjects by lazy {
             arrayOf(
@@ -206,7 +263,8 @@ sealed class ActionPerformer(val action: String) {
                 LongClickCenter,
                 LongClick,
                 Back,
-                None
+                None,
+                ScrollUp
             )
         }
 
