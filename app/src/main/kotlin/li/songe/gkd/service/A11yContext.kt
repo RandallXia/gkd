@@ -131,12 +131,12 @@ class A11yContext(
         return A11yService.instance?.safeActiveWindow
     }
 
-    private fun getA11Child(node: AccessibilityNodeInfo, index: Int): AccessibilityNodeInfo? {
+    private fun getA11Child(node: AccessibilityNodeInfo, index: Int): AccessibilityNodeInfo {
         guardInterrupt()
         return node.getChild(index)?.apply { setGeneratedTime() }
     }
 
-    private fun getA11Parent(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+    private fun getA11Parent(node: AccessibilityNodeInfo): AccessibilityNodeInfo {
         guardInterrupt()
         return node.parent?.apply { setGeneratedTime() }
     }
@@ -205,7 +205,7 @@ class A11yContext(
         }
     }
 
-    private fun getPureIndex(node: AccessibilityNodeInfo): Int? {
+    private fun getPureIndex(node: AccessibilityNodeInfo): Int {
         return indexCache[node]
     }
 
@@ -304,7 +304,7 @@ class A11yContext(
         else -> null
     }
 
-    private val transform = Transform(
+    val transform = Transform(
         getAttr = { target, name ->
             when (target) {
                 is QueryContext<*> -> when (name) {
