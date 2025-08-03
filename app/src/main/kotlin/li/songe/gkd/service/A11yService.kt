@@ -43,6 +43,9 @@ import li.songe.gkd.data.ResolvedRule
 import li.songe.gkd.data.RpcError
 import li.songe.gkd.data.RuleStatus
 import li.songe.gkd.debug.SnapshotExt
+import li.songe.gkd.executor.ExecutorCallback
+import li.songe.gkd.executor.ExecutorConfig
+import li.songe.gkd.executor.GkdExecutor
 import li.songe.gkd.permission.shizukuOkState
 import li.songe.gkd.shizuku.safeGetTopActivity
 import li.songe.gkd.shizuku.serviceWrapperFlow
@@ -73,9 +76,32 @@ open class A11yService : AccessibilityService(), OnCreate, OnA11yConnected, OnA1
         onCreated()
     }
 
+    // 添加执行器实例
+    private lateinit var gkdExecutor: GkdExecutor
+    
     override fun onServiceConnected() {
         super.onServiceConnected()
+        // 初始化执行器
+        gkdExecutor = GkdExecutor(this)
         onA11yConnected()
+    }
+
+    // 添加主动执行方法
+    fun executeRule(
+        selector: String,
+        action: String = "click",
+        callback: ExecutorCallback? = null
+    ) {
+        val config = ExecutorConfig(
+            selector = selector,
+            action = action,
+            fastQuery = true
+        )
+        gkdExecutor.executeRule(config, callback)
+    }
+
+    fun executeRules(configs: List<ExecutorConfig>, callback: ExecutorCallback? = null) {
+        gkdExecutor.executeRules(configs, callback)
     }
 
     override val a11yEventCallbacks = mutableListOf<(AccessibilityEvent) -> Unit>()

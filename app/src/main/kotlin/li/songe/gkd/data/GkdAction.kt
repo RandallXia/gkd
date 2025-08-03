@@ -206,12 +206,12 @@ sealed class ActionPerformer(val action: String) {
             val screenHeight = ScreenUtils.getScreenHeight()
             
             // 起点和终点位置添加随机性
-            val startX = screenWidth * (0.4f + random.nextFloat() * 0.1f)
+            val startX = screenWidth * (0.25f + random.nextFloat() * 0.1f)
             val startY = screenHeight * (0.75f + random.nextFloat() * 0.1f)
             
             // 确定滑动方向（轻微向左或向右，但保持一致方向）
             // 生成一个-1到1之间的值，决定整体滑动方向
-            val directionBias = random.nextFloat() * 0.3f - 0.15f // -0.15到0.15之间的偏移
+            val directionBias = random.nextFloat() * 0.3f // 0到0.3之间的偏移
             
             // 终点X坐标在起点基础上添加方向偏移
             val endX = startX + screenWidth * directionBias
@@ -238,15 +238,7 @@ sealed class ActionPerformer(val action: String) {
             return ActionResult(
                 action = action, result = context.dispatchGesture(
                     gesture, object : AccessibilityService.GestureResultCallback() {
-                        override fun onCompleted(gestureDescription: GestureDescription) {
-                            super.onCompleted(gestureDescription)
-                            //                LogUtil.d(TAG, "dispatchGesture onCompleted: 完成...");
-                        }
 
-                        override fun onCancelled(gestureDescription: GestureDescription) {
-                            super.onCancelled(gestureDescription)
-                            //                LogUtil.d(TAG, "dispatchGesture onCancelled: 取消...");
-                        }
                     }, null
                 )
             )

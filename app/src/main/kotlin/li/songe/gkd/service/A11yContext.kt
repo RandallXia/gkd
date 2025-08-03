@@ -304,7 +304,7 @@ class A11yContext(
         else -> null
     }
 
-    private val transform = Transform(
+    val transform = Transform(
         getAttr = { target, name ->
             when (target) {
                 is QueryContext<*> -> when (name) {
