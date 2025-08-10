@@ -82,6 +82,7 @@ data class RawSubscription(
     fun getAppGroups(appId: String): List<RawAppGroup> {
         return apps.find { a -> a.id == appId }?.groups ?: emptyList()
     }
+
     fun getApp(appId: String): RawApp {
         return apps.find { a -> a.id == appId } ?: RawApp(
             id = appId,
@@ -283,7 +284,7 @@ data class RawSubscription(
         val cacheMap: MutableMap<String, Selector?>
         val cacheStr: String
         val cacheJsonObject: JsonObject
-
+        val manually: Boolean?
         val groupType: Int
             get() = when (this) {
                 is RawAppGroup -> SubsConfig.AppGroupType
@@ -350,6 +351,7 @@ data class RawSubscription(
         override val matchSystemApp: Boolean?,
         override val matchLauncher: Boolean?,
         val disableIfAppGroupMatch: String?,
+        override val manually: Boolean? = false, // 添加可主动执行标识，默认为false
         override val rules: List<RawGlobalRule>,
         override val apps: List<RawGlobalApp>?,
     ) : RawGroupProps, RawGlobalRuleProps {
@@ -464,6 +466,7 @@ data class RawSubscription(
         override val versionCodes: List<Long>?,
         override val excludeVersionCodes: List<Long>?,
         val ignoreGlobalGroupMatch: Boolean?,
+        override val manually: Boolean? = false, // 添加可主动执行标识，默认为false
     ) : RawGroupProps, RawAppRuleProps {
         override val cacheMap by lazy { HashMap<String, Selector?>() }
         override val errorDesc by lazy { getErrorDesc() }
@@ -777,6 +780,7 @@ data class RawSubscription(
                 priorityTime = getLong(jsonObject, "priorityTime"),
                 priorityActionMaximum = getInt(jsonObject, "priorityActionMaximum"),
                 ignoreGlobalGroupMatch = getBoolean(jsonObject, "ignoreGlobalGroupMatch"),
+                manually = getBoolean(jsonObject, "manually"),
             )
         }
 
@@ -889,6 +893,7 @@ data class RawSubscription(
                 priorityTime = getLong(jsonObject, "priorityTime"),
                 priorityActionMaximum = getInt(jsonObject, "priorityActionMaximum"),
                 disableIfAppGroupMatch = getString(jsonObject, "disableIfAppGroupMatch"),
+                manually = getBoolean(jsonObject, "manually"),
             )
         }
 

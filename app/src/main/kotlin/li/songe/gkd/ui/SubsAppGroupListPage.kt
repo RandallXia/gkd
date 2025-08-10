@@ -37,7 +37,14 @@ import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.annotation.RootGraph
 import com.ramcosta.composedestinations.generated.destinations.UpsertRuleGroupPageDestination
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import li.songe.gkd.appScope
+import li.songe.gkd.data.GkdAction
 import li.songe.gkd.db.DbSet
+import li.songe.gkd.executor.ExecutorCallback
+import li.songe.gkd.executor.ExecutorResult
+import li.songe.gkd.service.A11yService
 import li.songe.gkd.ui.component.AnimationFloatingActionButton
 import li.songe.gkd.ui.component.BatchActionButtonGroup
 import li.songe.gkd.ui.component.EmptyText
@@ -310,6 +317,61 @@ fun SubsAppGroupListPage(
                                 appId,
                             )
                         )
+                    },
+                    onExecute = { globalGroup ->
+                        // 获取 A11yService 实例
+                        val a11yService = A11yService.weakInstance.get()
+                        if (a11yService != null && globalGroup.rules.isNotEmpty()) {
+                            // 创建所有规则的 GkdAction 列表
+                            // 在构建 actions 时直接处理延迟
+                            val actions = globalGroup.rules.mapNotNull { rule ->
+                                val selector = rule.matches?.firstOrNull()
+                                selector?.let {
+                                    // 如果规则有延迟，先处理延迟
+                                    if ((rule.actionDelay ?: 0) > 0) {
+                                        appScope.launch {
+                                            delay(rule.actionDelay ?: 0)
+                                            val action = GkdAction(
+                                                selector = it,
+                                                action = rule.action ?: "click",
+                                                fastQuery = true
+                                            )
+                                            a11yService.executeRule(action)
+                                        }
+                                        null // 返回 null，不加入批量执行列表
+                                    } else {
+                                        // 无延迟的规则直接返回
+                                        GkdAction(
+                                            selector = it,
+                                            action = rule.action ?: "click",
+                                            fastQuery = true
+                                        )
+                                    }
+                                }
+                            }
+
+                            if (actions.isNotEmpty()) {
+                                // 批量执行所有规则
+                                a11yService.executeRules(actions, object : ExecutorCallback {
+                                    override fun onBatchSuccess(results: List<ExecutorResult>) {
+                                        appScope.launch(Dispatchers.Main) {
+                                            val successCount = results.count { it.success }
+                                            toast("执行完成: $successCount/${results.size} 条规则成功")
+                                        }
+                                    }
+
+                                    override fun onError(error: Exception) {
+                                        appScope.launch(Dispatchers.Main) {
+                                            toast("执行失败: ${error.message}")
+                                        }
+                                    }
+                                })
+                            } else {
+                                toast("无法执行：所有规则选择器均为空")
+                            }
+                        } else {
+                            toast("无法执行：无障碍服务未运行或规则为空")
+                        }
                     }
                 )
             }

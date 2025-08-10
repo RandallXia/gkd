@@ -1,14 +1,12 @@
 package li.songe.gkd.executor
 
 import android.accessibilityservice.AccessibilityService
-import android.view.accessibility.AccessibilityNodeInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import li.songe.gkd.data.ActionPerformer
-import li.songe.gkd.data.ActionResult
+import li.songe.gkd.data.GkdAction
 import li.songe.gkd.data.info2nodeList
 import li.songe.gkd.service.A11yContext
 import li.songe.selector.MatchOption
@@ -22,16 +20,16 @@ class GkdExecutor(private val accessibilityService: AccessibilityService) {
 
     /**
      * 执行单个规则
-     * @param config 执行配置
+     * @param action GkdAction 执行配置
      * @param callback 执行回调
      */
     fun executeRule(
-        config: ExecutorConfig,
+        action: GkdAction,
         callback: ExecutorCallback? = null
     ) {
         scope.launch {
             try {
-                val result = performRule(config)
+                val result = performRule(action)
                 withContext(Dispatchers.Main) {
                     callback?.onSuccess(result)
                 }
@@ -45,30 +43,25 @@ class GkdExecutor(private val accessibilityService: AccessibilityService) {
 
     /**
      * 批量执行规则
-     * @param configs 执行配置列表
+     * @param actions GkdAction 执行配置列表
      * @param callback 执行回调
      */
     fun executeRules(
-        configs: List<ExecutorConfig>,
+        actions: List<GkdAction>,
         callback: ExecutorCallback? = null
     ) {
         scope.launch {
             val results = mutableListOf<ExecutorResult>()
 
-            for (config in configs) {
+            for (action in actions) {
                 try {
-                    val result = performRule(config)
+                    val result = performRule(action)
                     results.add(result)
-
-                    // 如果配置了执行后延迟，则等待
-                    config.delayAfterExecution?.let {
-                        delay(it)
-                    }
                 } catch (e: Exception) {
                     // 创建失败的结果
                     val failedResult = ExecutorResult(
-                        selector = config.selector,
-                        action = config.action,
+                        selector = action.selector,
+                        action = action.action ?: "click",
                         success = false,
                         message = "执行失败: ${e.message}"
                     )
@@ -86,62 +79,56 @@ class GkdExecutor(private val accessibilityService: AccessibilityService) {
 
             withContext(Dispatchers.Main) {
                 callback?.onSuccess(batchResult)
+                callback?.onBatchSuccess(results)
             }
         }
     }
 
-    private suspend fun performRule(config: ExecutorConfig): ExecutorResult =
+    private suspend fun performRule(action: GkdAction): ExecutorResult =
         withContext(Dispatchers.IO) {
             try {
-                // 获取当前活动窗口
-                val rootNode = accessibilityService.rootInActiveWindow
+                // 使用 A11yService.execAction 方法执行动作
+                val serviceVal = accessibilityService
+                val selector = Selector.parseOrNull(action.selector)
+                    ?: throw IllegalArgumentException("无效的选择器: ${action.selector}")
+                
+                val matchOption = MatchOption(
+                    fastQuery = action.fastQuery
+                )
+                val cache = A11yContext(true)
+
+                val rootNode = serviceVal.rootInActiveWindow
                     ?: throw IllegalStateException("无法获取当前活动窗口")
 
-                // 解析选择器
-                val selector = Selector.parseOrNull(config.selector)
-                    ?: throw IllegalArgumentException("无效的选择器: ${config.selector}")
-
-                // 查找目标节点 - 修正 MatchOption 的构造
-                val matchOption = MatchOption(
-                    fastQuery = config.fastQuery
-                )
-
-                // 使用正确的方法查找节点
-                val targetNode =
-                    a11yContext.transform.querySelector(rootNode, selector, matchOption)
-                        ?: throw IllegalStateException("未找到匹配的节点")
-
+                val targetNode = cache.querySelfOrSelector(
+                    rootNode,
+                    selector,
+                    matchOption
+                ) ?: throw IllegalStateException("未找到匹配的节点")
+                
                 // 执行动作
-                val actionResult = performAction(targetNode, config)
+                val performer =
+                    ActionPerformer.getAction(action.action ?: ActionPerformer.None.action)
+                val actionResult = performer.perform(serviceVal, targetNode, action.position)
 
-                // 创建节点信息 - 使用 info2nodeList 获取正确的 NodeInfo
+                // 创建节点信息
                 val nodeInfoList = info2nodeList(targetNode)
                 val nodeInfo = nodeInfoList.firstOrNull()
 
                 ExecutorResult(
-                    selector = config.selector,
-                    action = config.action,
+                    selector = action.selector,
+                    action = action.action ?: "click",
                     success = actionResult.result,
                     message = if (actionResult.result) "执行成功" else "执行失败",
                     nodeInfo = nodeInfo
                 )
             } catch (e: Exception) {
                 ExecutorResult(
-                    selector = config.selector,
-                    action = config.action,
+                    selector = action.selector,
+                    action = action.action ?: "click",
                     success = false,
                     message = "执行异常: ${e.message}"
                 )
             }
         }
-
-    private fun performAction(
-        node: AccessibilityNodeInfo,
-        config: ExecutorConfig
-    ): ActionResult {
-        // 复用现有的 ActionPerformer 实现
-        val performer = ActionPerformer.getAction(config.action)
-
-        return performer.perform(accessibilityService, node, config.position)
-    }
 }

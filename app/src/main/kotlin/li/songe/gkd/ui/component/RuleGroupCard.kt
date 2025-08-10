@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.ToggleOff
 import androidx.compose.material.icons.outlined.ToggleOn
 import androidx.compose.material3.Card
@@ -71,6 +72,7 @@ fun RuleGroupCard(
     isSelected: Boolean = false,
     onLongClick: () -> Unit = {},
     onSelectedChange: () -> Unit = {},
+    onExecute: ((RawSubscription.RawGroupProps) -> Unit)? = null, // 添加执行回调参数
 ) {
     val mainVm = LocalMainViewModel.current
 
@@ -229,6 +231,21 @@ fun RuleGroupCard(
                     )
                 }
             }
+
+            // 添加执行按钮（仅对全局规则组显示）
+            if (group.manually == true && !isSelectedMode && onExecute != null) {
+                IconButton(
+                    onClick = throttle { onExecute(group) },
+                    modifier = Modifier.minimumInteractiveComponentSize(),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = "执行",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.width(8.dp))
             key(subs.id, appId, group.key) {
                 val percent = usePercentAnimatable(!isSelectedMode)
